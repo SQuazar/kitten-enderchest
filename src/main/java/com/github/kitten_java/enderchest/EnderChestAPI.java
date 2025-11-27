@@ -1,37 +1,44 @@
 package com.github.kitten_java.enderchest;
 
 import com.github.kitten_java.enderchest.config.Configuration;
-import com.github.kitten_java.enderchest.economy.EconomyRealization;
-import com.github.kitten_java.enderchest.economy.PlayerPointsRealization;
-import com.github.kitten_java.enderchest.economy.VaultRealization;
-import com.google.common.collect.HashBiMap;
-import lombok.Getter;
-import lombok.Setter;
+import com.github.kitten_java.enderchest.economy.EconomyProvider;
+import com.github.kitten_java.enderchest.economy.PlayerPointsProvider;
+import com.github.kitten_java.enderchest.economy.VaultProvider;
+import com.github.kitten_java.enderchest.factory.ChestSlotFactory;
+import com.github.kitten_java.enderchest.inventory.AdvancedEnderChest;
+import com.github.kitten_java.enderchest.listener.EnderChestListener;
+import com.github.kitten_java.enderchest.manager.EnderChestManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.Map;
-import java.util.UUID;
-
 public final class EnderChestAPI extends JavaPlugin {
+    private EnderChestManager enderChestManager;
 
-    @Getter private static EnderChestAPI instance;
+    @Override
+    public void onEnable() {
+        ChestSlotFactory slotFactory = new ChestSlotFactory();
+        Configuration conf = new Configuration(this, slotFactory);
 
-    @Getter private Configuration conf;
-    @Getter @Setter private EconomyRealization economy;
-    @Getter private Map<UUID, EnderChest> enderchests = HashBiMap.create();
+        EconomyProvider economyProvider = conf.isVault() ?
+                new VaultProvider()
+                : new PlayerPointsProvider();
 
-    public void onEnable(){
-        instance = this;
-        conf = new Configuration();
-        if (conf.isVault()){
-            economy = new VaultRealization();
-        }else economy = new PlayerPointsRealization();
-        Bukkit.getPluginManager().registerEvents(new Listener(), this);
+        this.enderChestManager = new EnderChestManager(this, economyProvider, conf);
+
+        Bukkit.getPluginManager().registerEvents(new EnderChestListener(enderChestManager), this);
     }
 
-    public boolean takeIfHas(Player player, double amount){
-        return economy.takeIfHas(player, amount);
+    @Override
+    public void onDisable() {
+        enderChestManager.uploadCachedData();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            InventoryHolder holder = player.getOpenInventory().getTopInventory().getHolder();
+            if (holder != null && holder.getClass().getName().equals(AdvancedEnderChest.class.getName())) {
+                player.closeInventory(InventoryCloseEvent.Reason.PLUGIN);
+            }
+        }
     }
 }
