@@ -6,20 +6,15 @@ import org.bukkit.entity.Player;
 
 import java.util.UUID;
 
-public class PlayerPointsRealization implements EconomyRealization{
+public class PlayerPointsProvider implements EconomyProvider {
+    private final PlayerPointsAPI economy;
 
-    private PlayerPointsAPI economy;
-
-    public PlayerPointsRealization(){
+    public PlayerPointsProvider(){
         economy = PlayerPoints.getInstance().getAPI();
     }
 
     @Override
     public boolean takeIfHas(Player player, double amount) {
-        UUID uuid = player.getUniqueId();
-        if (economy.look(uuid) >= amount){
-            return economy.give(uuid, (int) -amount);
-        }
-        return false;
+        return economy.take(player.getUniqueId(), (int) amount);
     }
 }

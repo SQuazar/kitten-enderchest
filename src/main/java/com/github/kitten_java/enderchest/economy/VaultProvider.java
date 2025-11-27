@@ -4,20 +4,15 @@ import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-public class VaultRealization implements EconomyRealization{
+public class VaultProvider implements EconomyProvider {
+    private final Economy economy;
 
-    private Economy economy;
-
-    public VaultRealization(){
+    public VaultProvider(){
         economy = Bukkit.getServer().getServicesManager().getRegistration(Economy.class).getProvider();
     }
 
     @Override
     public boolean takeIfHas(Player player, double amount) {
-        if (economy.has(player, amount)){
-            economy.withdrawPlayer(player, amount);
-            return true;
-        }
-        return false;
+        return economy.withdrawPlayer(player, amount).transactionSuccess();
     }
 }
