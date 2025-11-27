@@ -1,69 +1,69 @@
 package com.github.kitten_java.enderchest.config;
 
 import com.github.kitten_java.enderchest.EnderChestAPI;
-import com.google.common.collect.HashBiMap;
+import com.github.kitten_java.enderchest.factory.ChestSlotFactory;
+import com.github.kitten_java.enderchest.inventory.ChestSlot;
+import lombok.AccessLevel;
 import lombok.Getter;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
+import net.kyori.adventure.text.Component;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
 
 import java.io.File;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
+
+import static net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacyAmpersand;
 
 @Getter
 public class Configuration {
+    private final Messages messages;
+    private final boolean isVault;
+    private final InventorySettings inventorySettings;
 
-    private Map<Integer, ItemStack> lockItems = HashBiMap.create();
-    private NamespacedKey nbtKey;
-    private String title;
-    private int maxSize, startSize;
-    private String notLoadedMessage, successfulBuyMessage, noPointsMessage;
-    private boolean isVault;
+    @Getter(AccessLevel.PRIVATE)
+    private final Map<Integer, Supplier<ChestSlot>> lockedSlots = new HashMap<>();
 
-    public Configuration(){
-        File file = new File(EnderChestAPI.getInstance().getDataFolder(), "config.yml");
-        if (!file.exists()){
-            EnderChestAPI.getInstance().saveResource("config.yml", false);
-        }
+    public Configuration(EnderChestAPI plugin, ChestSlotFactory lockedSlotFactory) {
+        File file = new File(plugin.getDataFolder(), "config.yml");
+        if (!file.exists()) plugin.saveResource("config.yml", false);
+
         FileConfiguration config = YamlConfiguration.loadConfiguration(file);
-        title = config.getString("title", "");
-        maxSize = config.getInt("max-size", 6)*9;
-        startSize = config.getInt("start-size", 27);
-        nbtKey = NamespacedKey.fromString(config.getString("namespaced", "not-defined-and-using-default"));
-        notLoadedMessage = config.getString("messages.not-loaded", "");
-        successfulBuyMessage = config.getString("messages.successfull-buy", "");
-        noPointsMessage = config.getString("messages.no-points", "");
-        isVault = config.getString("economy-type", "Vault").toLowerCase().equals("vault");
+        Component title = legacyAmpersand().deserialize(config.getString("title", ""));
+        int maxSize = config.getInt("max-size", 6) * 9;
+        int startSize = config.getInt("start-size", 27);
+
+        this.inventorySettings = new InventorySettings(title, maxSize, startSize);
+
+        messages = new Messages(
+                legacyAmpersand().deserialize(config.getString("messages.not-loaded", "")),
+                legacyAmpersand().deserialize(config.getString("messages.successfull-buy", "")),
+                legacyAmpersand().deserialize(config.getString("messages.no-points", ""))
+        );
+        isVault = config.getString("economy-type", "Vault").equalsIgnoreCase("vault");
 
         ConfigurationSection lockItemsSection = config.getConfigurationSection("lock-items");
         for (String key : lockItemsSection.getKeys(false)){
-            ItemStack i = readItem(lockItemsSection.getConfigurationSection(key));
-            lockItems.put(Integer.parseInt(key), i);
+            lockedSlots.put(Integer.parseInt(key), () -> lockedSlotFactory.create(lockItemsSection.getConfigurationSection(key)));
         }
     }
 
-    public ItemStack getLockItemForSlot(int slot){
-        ItemStack result;
+    public ChestSlot getLockItemForSlot(int slot){
+        Supplier<ChestSlot> result;
         do{
-            result = lockItems.get(slot);
+            result = lockedSlots.get(slot);
             slot--;
         } while (result == null);
-        return result;
+        return result.get();
     }
 
-    private ItemStack readItem(ConfigurationSection s){
-        ItemStack result = new ItemStack(Material.valueOf(s.getString("material", "barrier").toUpperCase()), s.getInt("amount", 1));
-        ItemMeta meta = result.getItemMeta();
-        meta.setDisplayName(s.getString("displayname", ""));
-        meta.setLore(s.getStringList("lore"));
-        meta.setCustomModelData(s.getInt("model", 0));
-        meta.getPersistentDataContainer().set(nbtKey, PersistentDataType.DOUBLE, s.getDouble("price", 1.0));
-        result.setItemMeta(meta);
-        return result;
+    public record Messages(
+            Component notLoaded,
+            Component purchaseSuccessful,
+            Component purchaseFailed
+    ) {
+
     }
 }
