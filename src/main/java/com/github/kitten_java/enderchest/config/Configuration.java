@@ -45,17 +45,17 @@ public class Configuration {
         isVault = config.getString("economy-type", "Vault").equalsIgnoreCase("vault");
 
         ConfigurationSection lockItemsSection = config.getConfigurationSection("lock-items");
-        for (String key : lockItemsSection.getKeys(false)){
+        for (String key : lockItemsSection.getKeys(false)) {
             lockedSlots.put(Integer.parseInt(key), () -> lockedSlotFactory.create(lockItemsSection.getConfigurationSection(key)));
         }
     }
 
-    public ChestSlot getLockItemForSlot(int slot){
+    public ChestSlot getLockItemForSlot(int slot) {
         Supplier<ChestSlot> result;
-        do{
+        do {
             result = lockedSlots.get(slot);
             slot--;
-        } while (result == null);
+        } while (result == null && slot > 0);
         return result.get();
     }
 

@@ -42,12 +42,14 @@ public class EnderChestManager {
             ChestSlot[] slots = container.get(key, CHEST_SLOT_DATA_TYPE);
             if (slots == null) slots = new ChestSlot[settings.maxSize()];
 
-            if (slots.length >= settings.maxSize())
+            if (slots.length != settings.maxSize() - 1)
                 slots = Arrays.copyOf(slots, settings.maxSize());
 
             for (int i = 0; i < slots.length; i++) {
+                if (slots[i] == null && i < settings.startSize()) slots[i] = new ChestSlot(new ItemStack(Material.AIR), 0, false);
                 if (slots[i] != null && slots[i].isLocked())
                     slots[i] = configuration.getLockItemForSlot(i);
+                if (slots[i] == null && i >= settings.startSize()) slots[i] = configuration.getLockItemForSlot(i);
             }
             chest = new AdvancedEnderChest(slots, this, settings);
         } else {
